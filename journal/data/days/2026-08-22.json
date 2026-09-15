@@ -1,0 +1,44 @@
+{
+  "date": "2026-08-22",
+  "logged": false,
+  "dayScore": null,
+  "gym": {
+    "hit": null,
+    "score": null,
+    "cardio": null,
+    "note": ""
+  },
+  "diet": {
+    "score": null,
+    "protein_g": null,
+    "calories": null,
+    "deficit_ok": null,
+    "protein_ok": null,
+    "note": ""
+  },
+  "sleep": {
+    "asleep_at": null,
+    "woke_at": null,
+    "alarm_used": null,
+    "score": null,
+    "note": ""
+  },
+  "night_brush": {
+    "done": null
+  },
+  "work": {
+    "keepalive": { "score": null, "note": "" },
+    "leverage": { "score": null, "note": "" },
+    "future": { "score": null, "note": "" }
+  },
+  "academics": {
+    "active": false,
+    "score": null,
+    "note": ""
+  },
+  "reflection": {
+    "wins": [],
+    "friction": "",
+    "tomorrow": ""
+  }
+}

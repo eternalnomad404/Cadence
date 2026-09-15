@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg: #f3f5f4;
+    --surface: #fbfcfa;
+    --sidebar: #e9eeec;
+    --ink: #1b2421;
+    --muted: #5e6b66;
+    --border: #d5ddd8;
+    --accent: #3f7f78;
+    --accent-hover: #346b65;
+    --accent-wash: #dcebe8;
+    --moss: #6f8f6a;
+    --rose: #b86b6b;
+    --rose-wash: #f8eded;
+    --faint: #a3b0a9;
+    --card-shadow: 0 1px 3px rgba(27, 36, 33, 0.04);
+    /* Soft plate behind product photos (white studio bg blends away via multiply) */
+    --food-plate: #eef1ef;
+  }
+
+  [data-theme="dark"],
+  .dark {
+    --bg: #121614;
+    --surface: #1a1f1c;
+    --sidebar: #161b18;
+    --ink: #e8ede9;
+    --muted: #9aa89f;
+    --border: #2a322e;
+    --accent: #5a9e96;
+    --accent-hover: #6bafa6;
+    --accent-wash: #243532;
+    --moss: #8aad84;
+    --rose: #c98a8a;
+    --rose-wash: #3a2828;
+    --faint: #6b7872;
+    --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    --food-plate: #1e2421;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+}
+
+.font-serif-display {
+  font-family: 'Newsreader', Georgia, serif;
+}
+
+.font-mono-code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom scrollbar for horizontal category and archive strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Food menu thumbs — theme plate only; images keep full brightness (transparent PNG bg) */
+.food-menu-plate {
+  background-color: var(--food-plate);
+}

@@ -1,0 +1,15 @@
+# Netlify — set Base directory to `journal` in site settings
+# (or deploy from this folder as the site root)
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA fallback for client-side day routes / refresh
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
