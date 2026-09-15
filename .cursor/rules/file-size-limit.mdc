@@ -1,0 +1,38 @@
+---
+description: Keep source files under 600 lines — split when larger
+alwaysApply: true
+---
+
+# File size limit (600 lines)
+
+To keep Cadence (and this workspace) clean and maintainable:
+
+## Hard limit
+
+- **No source file may exceed 600 lines** of code.
+- Applies to: `.ts`, `.tsx`, `.js`, `.jsx`, `.css`, `.mdc` rule files you create/edit, and similar app source.
+- Does **not** apply to: `package-lock.json`, build output (`dist/`), generated assets, or large data dumps Aman explicitly wants as one file.
+
+## When editing or creating code
+
+1. Before finishing a task, check line counts of files you touched.
+2. If a file is **over 600 lines** (or a change would push it over): **split it** into focused modules before you consider the work done.
+3. Prefer organization by **feature / section / concern** (e.g. one UI section per file), not random cuts mid-function.
+4. Keep a thin parent/orchestrator that imports the pieces and preserves the same public API.
+
+## Split patterns (preferred)
+
+| Too big | Split into |
+|---------|------------|
+| Giant page component | Section components + small hooks |
+| Huge utils file | Domain helpers (`gymScore`, `foodMenu`, …) |
+| Fat API/plugin | One handler module per route/concern |
+| Long rules doc | Separate `.mdc` files by topic |
+
+## Do not
+
+- Leave a file over 600 lines “for later”
+- Stuff unrelated logic into an already-large file
+- Use mega-files as the default for new features
+
+Clean structure is part of the product — treat the 600-line cap as a hard engineering rule, same as commit message rules for day updates.

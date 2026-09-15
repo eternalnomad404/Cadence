@@ -1,0 +1,34 @@
+---
+description: Food menu images must be realistic product/food photos — never SVG cartoons or flat icons
+globs: journal/src/data/foodMenu.ts,journal/public/foods/**
+alwaysApply: true
+---
+
+# Cadence food menu images
+
+When adding or changing items in `journal/src/data/foodMenu.ts` (or assets under `journal/public/foods/`):
+
+## Required image style
+
+- Use **realistic photographs** of the real product or plated food — same look as existing items (`peanut-butter.png`, `amul-fresh-paneer.png`, roti, bread, shakes, etc.).
+- Studio-style: subject centered, **plain white / seamless background**, soft natural lighting, soft contact shadow.
+- Save as **PNG** in `journal/public/foods/<id>.png` and set `image: '/foods/<id>.png'` on the menu item.
+- After adding a new PNG, run `python journal/scripts/recut_food_bg.py` (uses **rembg** for a clean alpha). Do **not** use the old flood-fill knock script for final assets, and do **not** use CSS `mix-blend-mode` / brightness filters to “fake” dark mode — that dims the food.
+
+## Forbidden
+
+- SVG or CSS doodles
+- Flat / cartoon / vector / emoji / icon art
+- Abstract “exploded” food diagrams
+- Placeholder shapes “for later”
+- Dark-mode hacks that dim/multiply the whole photo
+
+## Process when Aman asks to add a food
+
+1. Add the `FoodItem` macros/entry in `foodMenu.ts`.
+2. **Generate or obtain a realistic PNG** in the same style as current `/foods/*.png` assets before finishing.
+3. Wire `image` to that PNG — do not ship with SVG or missing art.
+4. Knock out the white studio background with `recut_food_bg.py` (rembg) so the theme plate (`--food-plate`) shows through in light and dark mode.
+5. Do not leave cartoon placeholders even temporarily unless Aman explicitly says placeholders are OK.
+
+The diet UI uses `food-menu-plate` + `--food-plate` behind transparent product PNGs — food stays full brightness; only the plate follows the theme.
