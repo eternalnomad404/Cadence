@@ -52,7 +52,7 @@ function ChoiceRow({
 }
 
 export const GymQuickLog: React.FC<GymQuickLogProps> = ({ date, existing, onSaved }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(!existing);
   const [hit, setHit] = useState<boolean | null>(existing ? existing.hit : null);
   const [cardio, setCardio] = useState<boolean | null>(

@@ -25,6 +25,12 @@ import {
   resolveDefaultMorningKg,
   type WeightDraft,
 } from './data/weightDrafts';
+import {
+  loadHabitTimeDraftsFromFiles,
+  mergeHabitTimeDrafts,
+  readHabitTimeDraftsFromStorage,
+  type HabitTimeDraft,
+} from './data/habitTimeDrafts';
 import type { DietDraft } from './data/foodMenu';
 import { CHALLENGE_START_DATE, type GymLog } from './types';
 import { TopBar } from './components/TopBar';
@@ -66,6 +72,20 @@ export default function App() {
   const [weightDrafts, setWeightDrafts] = useState<Record<string, WeightDraft>>(() => {
     if (typeof window === 'undefined') return loadWeightDraftsFromFiles();
     return mergeWeightDrafts(loadWeightDraftsFromFiles(), readWeightDraftsFromStorage());
+  });
+  const [learningDrafts, setLearningDrafts] = useState<Record<string, HabitTimeDraft>>(() => {
+    if (typeof window === 'undefined') return loadHabitTimeDraftsFromFiles('learning');
+    return mergeHabitTimeDrafts(
+      loadHabitTimeDraftsFromFiles('learning'),
+      readHabitTimeDraftsFromStorage('learning')
+    );
+  });
+  const [outreachDrafts, setOutreachDrafts] = useState<Record<string, HabitTimeDraft>>(() => {
+    if (typeof window === 'undefined') return loadHabitTimeDraftsFromFiles('outreach');
+    return mergeHabitTimeDrafts(
+      loadHabitTimeDraftsFromFiles('outreach'),
+      readHabitTimeDraftsFromStorage('outreach')
+    );
   });
 
   useEffect(() => {
@@ -140,6 +160,14 @@ export default function App() {
     () => resolveDefaultMorningKg(selectedDate, daysData, weightDrafts),
     [selectedDate, daysData, weightDrafts]
   );
+  const currentLearningDraft = useMemo(
+    () => (currentLog ? null : learningDrafts[selectedDate] ?? null),
+    [currentLog, learningDrafts, selectedDate]
+  );
+  const currentOutreachDraft = useMemo(
+    () => (currentLog ? null : outreachDrafts[selectedDate] ?? null),
+    [currentLog, outreachDrafts, selectedDate]
+  );
 
   return (
     <div
@@ -178,6 +206,14 @@ export default function App() {
             onGymSaved={(gym) => setGymDrafts((prev) => ({ ...prev, [selectedDate]: gym }))}
             onDietSaved={(diet) => setDietDrafts((prev) => ({ ...prev, [selectedDate]: diet }))}
             onWeightSaved={(weight) => setWeightDrafts((prev) => ({ ...prev, [selectedDate]: weight }))}
+            learningDraft={currentLearningDraft}
+            outreachDraft={currentOutreachDraft}
+            onLearningSaved={(draft) =>
+              setLearningDrafts((prev) => ({ ...prev, [selectedDate]: draft }))
+            }
+            onOutreachSaved={(draft) =>
+              setOutreachDrafts((prev) => ({ ...prev, [selectedDate]: draft }))
+            }
           />
         )}
       </main>

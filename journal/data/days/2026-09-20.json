@@ -1,0 +1,95 @@
+{
+  "date": "2026-09-20",
+  "logged": false,
+  "dayScore": null,
+  "gym": {
+    "hit": true,
+    "score": 4,
+    "cardio": false,
+    "note": ""
+  },
+  "weight": {
+    "morning_kg": 80
+  },
+  "diet": {
+    "score": null,
+    "protein_g": 139.6,
+    "calories": 1828,
+    "deficit_ok": true,
+    "protein_ok": true,
+    "energy_delta": 572,
+    "note": "",
+    "entries": [
+      {
+        "foodId": "banana",
+        "qty": 1
+      },
+      {
+        "foodId": "superyou-protein",
+        "qty": 2
+      },
+      {
+        "foodId": "roti-plain",
+        "qty": 3
+      },
+      {
+        "foodId": "milky-mist-hp-paneer",
+        "qty": 150
+      },
+      {
+        "foodId": "custom",
+        "qty": 1,
+        "calories": 358,
+        "protein_g": 3
+      },
+      {
+        "foodId": "bread-high-protein",
+        "qty": 4
+      },
+      {
+        "foodId": "cheese-slice",
+        "qty": 2
+      },
+      {
+        "foodId": "protein-chips",
+        "qty": 1
+      }
+    ],
+    "maintenance_kcal": 2400
+  },
+  "sleep": {
+    "asleep_at": null,
+    "woke_at": null,
+    "alarm_used": null,
+    "score": null,
+    "note": ""
+  },
+  "night_brush": {
+    "done": null
+  },
+  "work": {
+    "keepalive": {
+      "score": null,
+      "note": ""
+    },
+    "leverage": {
+      "score": null,
+      "note": ""
+    },
+    "future": {
+      "score": null,
+      "note": ""
+    }
+  },
+  "academics": {
+    "active": false,
+    "score": null,
+    "note": ""
+  },
+  "reflection": {
+    "wins": [],
+    "friction": "",
+    "tomorrow": "",
+    "voiceDumpSnippet": ""
+  }
+}

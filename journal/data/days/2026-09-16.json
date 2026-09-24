@@ -1,0 +1,89 @@
+{
+  "date": "2026-09-16",
+  "logged": false,
+  "dayScore": null,
+  "gym": {
+    "hit": false,
+    "score": 1,
+    "cardio": false,
+    "note": ""
+  },
+  "weight": {
+    "morning_kg": 80.1
+  },
+  "diet": {
+    "score": null,
+    "protein_g": 125.6,
+    "calories": 1682,
+    "deficit_ok": null,
+    "protein_ok": false,
+    "energy_delta": 718,
+    "note": "",
+    "entries": [
+      {
+        "foodId": "superyou-protein",
+        "qty": 2
+      },
+      {
+        "foodId": "protein-chips",
+        "qty": 2
+      },
+      {
+        "foodId": "milky-mist-hp-paneer",
+        "qty": 50
+      },
+      {
+        "foodId": "chole",
+        "qty": 1
+      },
+      {
+        "foodId": "cooked-rice",
+        "qty": 300
+      },
+      {
+        "foodId": "bread-high-protein",
+        "qty": 2
+      },
+      {
+        "foodId": "peanut-butter",
+        "qty": 2
+      }
+    ],
+    "maintenance_kcal": 2400
+  },
+  "sleep": {
+    "asleep_at": null,
+    "woke_at": null,
+    "alarm_used": null,
+    "score": null,
+    "note": ""
+  },
+  "night_brush": {
+    "done": null
+  },
+  "work": {
+    "keepalive": {
+      "score": null,
+      "note": ""
+    },
+    "leverage": {
+      "score": null,
+      "note": ""
+    },
+    "future": {
+      "score": null,
+      "note": ""
+    }
+  },
+  "academics": {
+    "active": false,
+    "score": null,
+    "note": ""
+  },
+  "reflection": {
+    "wins": [],
+    "friction": "",
+    "tomorrow": "",
+    "voiceDumpSnippet": ""
+  }
+}

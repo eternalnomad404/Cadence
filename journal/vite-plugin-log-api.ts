@@ -88,6 +88,7 @@ function readBody(req: { on: (e: string, cb: (c?: Buffer) => void) => void }): P
  * POST /api/log-gym
  * POST /api/log-diet
  * POST /api/log-weight
+ * POST /api/log-habit-time
  */
 export function cadenceLogApiPlugin(journalRoot: string, repoRoot: string): Plugin {
   const journalDays = path.join(journalRoot, 'data', 'days');
@@ -99,7 +100,10 @@ export function cadenceLogApiPlugin(journalRoot: string, repoRoot: string): Plug
       server.middlewares.use(async (req, res, next) => {
         if (
           req.method !== 'POST' ||
-          (req.url !== '/api/log-gym' && req.url !== '/api/log-diet' && req.url !== '/api/log-weight')
+          (req.url !== '/api/log-gym' &&
+            req.url !== '/api/log-diet' &&
+            req.url !== '/api/log-weight' &&
+            req.url !== '/api/log-habit-time')
         ) {
           next();
           return;
@@ -112,12 +116,52 @@ export function cadenceLogApiPlugin(journalRoot: string, repoRoot: string): Plug
             gym?: GymPayload;
             diet?: DietPayload;
             weight?: { morning_kg: number };
+            kind?: 'learning' | 'outreach';
+            time?: { hours: number; minutes: number };
           };
           const date = body.date;
           if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ ok: false, error: 'Invalid date' }));
+            return;
+          }
+
+          if (req.url === '/api/log-habit-time') {
+            const kind = body.kind;
+            const hours = body.time?.hours;
+            const minutes = body.time?.minutes;
+            if (kind !== 'learning' && kind !== 'outreach') {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: false, error: 'Invalid kind' }));
+              return;
+            }
+            if (
+              typeof hours !== 'number' ||
+              typeof minutes !== 'number' ||
+              !Number.isFinite(hours) ||
+              !Number.isFinite(minutes) ||
+              hours < 0 ||
+              hours > 12 ||
+              minutes < 0 ||
+              minutes > 45
+            ) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: false, error: 'Invalid time' }));
+              return;
+            }
+            const time = {
+              hours: Math.round(hours),
+              minutes: Math.round(minutes / 15) * 15,
+            };
+            const patch = { [kind]: time };
+            mergeWrite(journalDays, date, patch);
+            mergeWrite(planDays, date, patch);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, date, kind, time }));
             return;
           }
 

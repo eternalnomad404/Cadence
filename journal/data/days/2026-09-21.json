@@ -1,0 +1,87 @@
+{
+  "date": "2026-09-21",
+  "logged": false,
+  "dayScore": null,
+  "gym": {
+    "hit": false,
+    "score": 1,
+    "cardio": false,
+    "note": ""
+  },
+  "weight": {
+    "morning_kg": 80
+  },
+  "diet": {
+    "score": null,
+    "protein_g": 69.2,
+    "calories": 2150,
+    "deficit_ok": null,
+    "protein_ok": false,
+    "energy_delta": 250,
+    "note": "",
+    "entries": [
+      {
+        "foodId": "roti-ghee",
+        "qty": 5
+      },
+      {
+        "foodId": "peanut-butter",
+        "qty": 2
+      },
+      {
+        "foodId": "bread-high-protein",
+        "qty": 2
+      },
+      {
+        "foodId": "banana",
+        "qty": 4
+      },
+      {
+        "foodId": "custom",
+        "qty": 1,
+        "calories": 400,
+        "protein_g": 20
+      },
+      {
+        "foodId": "protein-chips",
+        "qty": 1
+      }
+    ],
+    "maintenance_kcal": 2400
+  },
+  "sleep": {
+    "asleep_at": null,
+    "woke_at": null,
+    "alarm_used": null,
+    "score": null,
+    "note": ""
+  },
+  "night_brush": {
+    "done": null
+  },
+  "work": {
+    "keepalive": {
+      "score": null,
+      "note": ""
+    },
+    "leverage": {
+      "score": null,
+      "note": ""
+    },
+    "future": {
+      "score": null,
+      "note": ""
+    }
+  },
+  "academics": {
+    "active": false,
+    "score": null,
+    "note": ""
+  },
+  "reflection": {
+    "wins": [],
+    "friction": "",
+    "tomorrow": "",
+    "voiceDumpSnippet": ""
+  }
+}

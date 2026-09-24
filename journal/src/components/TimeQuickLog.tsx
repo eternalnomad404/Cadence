@@ -1,43 +1,54 @@
 import React, { useEffect, useState } from 'react';
-import { Scale, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import { FALLBACK_MORNING_KG, saveWeightLog, type WeightDraft } from '../data/weightDrafts';
+import { Check, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react';
 import { NumberStepper } from './NumberStepper';
 import { SmoothCollapse } from './SmoothCollapse';
+import {
+  formatHabitTime,
+  saveHabitTimeLog,
+  type HabitTimeDraft,
+  type HabitTimeKind,
+} from '../data/habitTimeDrafts';
 
-interface WeightQuickLogProps {
+interface TimeQuickLogProps {
   date: string;
-  existing?: WeightDraft | null;
-  defaultKg?: number;
-  fromPreviousDay?: boolean;
-  onSaved: (draft: WeightDraft) => void;
+  kind: HabitTimeKind;
+  title: string;
+  hint: string;
+  icon: LucideIcon;
+  existing?: HabitTimeDraft | null;
+  onSaved: (draft: HabitTimeDraft) => void;
 }
 
-function formatKg(n: number): string {
-  return Number(n.toFixed(1)).toString();
-}
-
-export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
+export const TimeQuickLog: React.FC<TimeQuickLogProps> = ({
   date,
+  kind,
+  title,
+  hint,
+  icon: Icon,
   existing,
-  defaultKg = FALLBACK_MORNING_KG,
-  fromPreviousDay = false,
   onSaved,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(!existing);
-  const [kg, setKg] = useState(() =>
-    existing ? formatKg(existing.morning_kg) : formatKg(defaultKg)
-  );
+  const [hours, setHours] = useState(() => String(existing?.hours ?? 0));
+  const [minutes, setMinutes] = useState(() => String(existing?.minutes ?? 0));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setKg(existing ? formatKg(existing.morning_kg) : formatKg(defaultKg));
+    setHours(String(existing?.hours ?? 0));
+    setMinutes(String(existing?.minutes ?? 0));
     setEditing(!existing);
-  }, [date, existing, defaultKg]);
+    setError(null);
+  }, [date, existing]);
 
-  const parsed = Number(kg);
-  const canSave = Number.isFinite(parsed) && parsed > 20 && parsed < 300;
+  const parsedHours = Number(hours);
+  const parsedMinutes = Number(minutes);
+  const canSave =
+    Number.isFinite(parsedHours) &&
+    Number.isFinite(parsedMinutes) &&
+    parsedHours >= 0 &&
+    parsedMinutes >= 0;
   const done = Boolean(existing) && !editing;
 
   const handleSave = async () => {
@@ -45,7 +56,7 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
     setSaving(true);
     setError(null);
     try {
-      const { draft } = await saveWeightLog(date, parsed);
+      const { draft } = await saveHabitTimeLog(kind, date, parsedHours, parsedMinutes);
       onSaved(draft);
       setEditing(false);
     } catch (e) {
@@ -84,21 +95,19 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
               color: 'var(--accent)',
             }}
           >
-            <Scale className="w-5 h-5" />
+            <Icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold font-serif-display text-base" style={{ color: 'var(--ink)' }}>
-              Body — Morning weight
+              {title}
             </h4>
             {!expanded ? (
               <p className="text-xs font-mono-code mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
-                {existing ? `${existing.morning_kg.toFixed(1)} kg` : `${formatKg(defaultKg)} kg · not saved`}
+                {existing ? formatHabitTime(existing) : 'Not logged'}
               </p>
             ) : (
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                {fromPreviousDay
-                  ? `Prefills yesterday (${formatKg(defaultKg)} kg) · tap to collapse`
-                  : 'Weigh after waking · tap to collapse'}
+                {done ? 'Logged · tap to collapse' : `${hint} · tap to collapse`}
               </p>
             )}
           </div>
@@ -125,14 +134,15 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
               <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {existing!.morning_kg.toFixed(1)} kg logged
+                  {formatHabitTime(existing!)} logged
                 </p>
                 <button
                   type="button"
                   className="mt-2 text-xs font-medium underline cursor-pointer"
                   style={{ color: 'var(--accent)' }}
                   onClick={() => {
-                    setKg(formatKg(existing!.morning_kg));
+                    setHours(String(existing!.hours));
+                    setMinutes(String(existing!.minutes));
                     setEditing(true);
                   }}
                 >
@@ -142,19 +152,38 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
             </div>
           ) : (
             <>
-              <NumberStepper
-                value={kg}
-                onChange={setKg}
-                step={0.1}
-                min={30}
-                max={250}
-                decimals={1}
-                unit="kg"
-                size="lg"
-                placeholder={formatKg(defaultKg)}
-                emptyStart={defaultKg}
-                aria-label="Morning weight in kilograms"
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 min-w-0">
+                  <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                    Hours
+                  </p>
+                  <NumberStepper
+                    value={hours}
+                    onChange={setHours}
+                    step={1}
+                    min={0}
+                    max={12}
+                    unit="h"
+                    size="sm"
+                    aria-label={`${title} hours`}
+                  />
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                    Minutes
+                  </p>
+                  <NumberStepper
+                    value={minutes}
+                    onChange={setMinutes}
+                    step={15}
+                    min={0}
+                    max={45}
+                    unit="m"
+                    size="sm"
+                    aria-label={`${title} minutes`}
+                  />
+                </div>
+              </div>
               {error && (
                 <p className="text-xs" style={{ color: 'var(--rose)' }}>
                   {error}
@@ -171,7 +200,7 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
                   color: '#fff',
                 }}
               >
-                {saving ? 'Saving…' : 'Save morning weight'}
+                {saving ? 'Saving…' : 'Save time'}
               </button>
             </>
           )}

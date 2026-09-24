@@ -113,6 +113,7 @@ export const NumberStepper: React.FC<NumberStepperProps> = ({
           value={value}
           placeholder={placeholder}
           onChange={(e) => handleType(e.target.value)}
+          onFocus={(e) => e.target.select()}
           onBlur={() => {
             if (value.trim() === '' || value === '.' || value === '-') return;
             const n = Number(value);
