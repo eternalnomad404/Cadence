@@ -112,7 +112,9 @@ export function BodySection({
                 Morning weight
               </p>
               <p className="text-lg font-semibold font-mono-code tabular-nums" style={{ color: 'var(--ink)' }}>
-                {typeof morningKg === 'number' ? `${morningKg.toFixed(1)} kg` : '—'}
+                {typeof morningKg === 'number'
+                  ? `${Number(morningKg.toFixed(2))} kg`
+                  : '—'}
               </p>
             </div>
           </div>

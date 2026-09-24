@@ -86,6 +86,20 @@ export const FOOD_MENU: FoodItem[] = [
     detail: '1 spoon ≈ 16g · ~102 kcal · 4.8g protein',
   },
   {
+    id: 'hp-peanut-butter',
+    name: 'High Protein Peanut Butter',
+    brand: 'HP peanut butter · 47.5 kcal · 5g P / 10g',
+    image: '/foods/hp-peanut-butter.png',
+    unit: 'g',
+    unitLabel: 'g',
+    defaultQty: 10,
+    step: 10,
+    // 47.5 kcal / 10g → 4.75 kcal/g; 5g P / 10g → 0.5g/g
+    caloriesPerUnit: 4.75,
+    proteinPerUnit: 0.5,
+    detail: '47.5 kcal · 5g protein / 10g',
+  },
+  {
     id: 'roti-plain',
     name: 'Roti (no ghee)',
     brand: 'Medium atta roti',

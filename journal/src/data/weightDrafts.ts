@@ -33,11 +33,11 @@ export function resolveDefaultMorningKg(
   const prev = previousCalendarDate(date);
   const fromLog = daysMap[prev]?.weight?.morning_kg;
   if (typeof fromLog === 'number' && Number.isFinite(fromLog) && fromLog > 0) {
-    return { kg: Number(fromLog.toFixed(1)), fromPrevious: true };
+    return { kg: Number(fromLog.toFixed(2)), fromPrevious: true };
   }
   const fromDraft = weightDrafts[prev]?.morning_kg;
   if (typeof fromDraft === 'number' && Number.isFinite(fromDraft) && fromDraft > 0) {
-    return { kg: Number(fromDraft.toFixed(1)), fromPrevious: true };
+    return { kg: Number(fromDraft.toFixed(2)), fromPrevious: true };
   }
   return { kg: FALLBACK_MORNING_KG, fromPrevious: false };
 }
@@ -48,7 +48,7 @@ export function extractWeightDraft(raw: DayFile): WeightDraft | null {
   if (!w || typeof w.morning_kg !== 'number' || !Number.isFinite(w.morning_kg) || w.morning_kg <= 0) {
     return null;
   }
-  return { morning_kg: Number(w.morning_kg.toFixed(1)) };
+  return { morning_kg: Number(w.morning_kg.toFixed(2)) };
 }
 
 export function loadWeightDraftsFromFiles(): Record<string, WeightDraft> {
@@ -106,7 +106,7 @@ export async function saveWeightLog(
   date: string,
   morning_kg: number
 ): Promise<{ draft: WeightDraft; persisted: 'file' | 'local' }> {
-  const draft: WeightDraft = { morning_kg: Number(morning_kg.toFixed(1)) };
+  const draft: WeightDraft = { morning_kg: Number(morning_kg.toFixed(2)) };
   writeWeightDraftToStorage(date, draft);
 
   try {

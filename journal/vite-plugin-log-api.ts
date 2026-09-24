@@ -173,7 +173,7 @@ export function cadenceLogApiPlugin(journalRoot: string, repoRoot: string): Plug
               res.end(JSON.stringify({ ok: false, error: 'Invalid weight' }));
               return;
             }
-            const patch = { weight: { morning_kg: Number(morning_kg.toFixed(1)) } };
+            const patch = { weight: { morning_kg: Number(morning_kg.toFixed(2)) } };
             mergeWrite(journalDays, date, patch);
             mergeWrite(planDays, date, patch);
             res.statusCode = 200;

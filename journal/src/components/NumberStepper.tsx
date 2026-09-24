@@ -7,7 +7,7 @@ type NumberStepperProps = {
   step?: number;
   min?: number;
   max?: number;
-  /** Round stepped values to this many decimals (weight = 1). */
+  /** Round stepped values to this many decimals (weight = 2). */
   decimals?: number;
   unit?: string;
   size?: 'sm' | 'lg';

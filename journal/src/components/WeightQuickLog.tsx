@@ -14,7 +14,7 @@ interface WeightQuickLogProps {
 }
 
 function formatKg(n: number): string {
-  return Number(n.toFixed(1)).toString();
+  return Number(n.toFixed(2)).toString();
 }
 
 export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
@@ -40,7 +40,7 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
   const parsed = Number(kg);
   const valid = Number.isFinite(parsed) && parsed > 20 && parsed < 300;
   const unchanged =
-    existing != null && valid && Math.abs(existing.morning_kg - parsed) < 0.05;
+    existing != null && valid && Math.abs(existing.morning_kg - parsed) < 0.005;
   // Prefill must not write until the user edits the stepper
   const ready = valid && !unchanged && (existing != null || touched);
 
@@ -58,7 +58,7 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
   useAutoSave(date, ready, kg, persist);
 
   const collapsedSummary = existing
-    ? `${existing.morning_kg.toFixed(1)} kg`
+    ? `${formatKg(existing.morning_kg)} kg`
     : fromPreviousDay
       ? `${formatKg(defaultKg)} kg · from yesterday`
       : `${formatKg(defaultKg)} kg · not set`;
@@ -131,10 +131,10 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
               setTouched(true);
               setKg(v);
             }}
-            step={0.1}
+            step={0.01}
             min={30}
             max={250}
-            decimals={1}
+            decimals={2}
             unit="kg"
             size="lg"
             placeholder={formatKg(defaultKg)}

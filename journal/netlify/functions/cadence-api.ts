@@ -87,7 +87,7 @@ export default async (req: Request) => {
       if (typeof morning_kg !== 'number' || !Number.isFinite(morning_kg) || morning_kg <= 0) {
         return json({ ok: false, error: 'Invalid weight' }, 400);
       }
-      const block = { morning_kg: Number(morning_kg.toFixed(1)) };
+      const block = { morning_kg: Number(morning_kg.toFixed(2)) };
       await writeDay(date, { weight: block });
       return json({ ok: true, date, weight: block });
     }
