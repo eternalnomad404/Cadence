@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UtensilsCrossed, Check, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { NumberStepper } from './NumberStepper';
 import { SmoothCollapse } from './SmoothCollapse';
@@ -15,6 +15,7 @@ import {
 import { saveDietLog } from '../data/dietDrafts';
 import { sortMenuByPreviousDay } from '../data/dietMenuOrder';
 import { MAINTENANCE_CALORIES, energyBalance } from '../data/calories';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { CustomFoodCard } from './CustomFoodCard';
 
 const PROTEIN_TARGET = 140;
@@ -33,6 +34,10 @@ function clampQty(n: number, step: number): number {
   return Math.min(max, Number(n.toFixed(1)));
 }
 
+function entriesSignature(entries: DietEntry[]): string {
+  return JSON.stringify(entries.map(normalizeEntry));
+}
+
 export const DietQuickLog: React.FC<DietQuickLogProps> = ({
   date,
   existing,
@@ -43,17 +48,14 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
     (existing?.entries ?? []).map(normalizeEntry)
   );
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(!existing);
   const [search, setSearch] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveHint, setSaveHint] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setEntries((existing?.entries ?? []).map(normalizeEntry));
-    setEditing(!existing);
     setSearch('');
-    setSaveHint(null);
+    setError(null);
     setQtyDrafts({});
   }, [date, existing]);
 
@@ -61,8 +63,6 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
   const balance = useMemo(() => energyBalance(draft.calories), [draft.calories]);
   const proteinPct = Math.min(100, Math.round((draft.protein_g / PROTEIN_TARGET) * 100));
   const selectedIds = useMemo(() => new Set(entries.map((e) => e.foodId)), [entries]);
-  const done = Boolean(existing) && !editing;
-  const logged = existing ?? draft;
   const menuItems = useMemo(
     () => sortMenuByPreviousDay(previousFoodIds),
     [previousFoodIds]
@@ -75,6 +75,23 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
       return hay.includes(q);
     });
   }, [menuItems, search]);
+
+  // Compare normalized draft totals (qty>0 only) so mid-edit zeros don't loop after save
+  const signature = entriesSignature(draft.entries);
+  const existingSig = entriesSignature(existing?.entries ?? []);
+  const ready = signature !== existingSig;
+
+  const persist = useCallback(async () => {
+    setError(null);
+    try {
+      const { draft: saved } = await saveDietLog(date, entries);
+      onSaved(saved);
+    } catch {
+      setError('Could not save');
+    }
+  }, [date, entries, onSaved]);
+
+  useAutoSave(date, ready, signature, persist);
 
   const upsert = (foodId: string, qty: number, removeIfZero = true) => {
     const food = getFoodById(foodId);
@@ -107,21 +124,6 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
       });
       upsert(foodId, 0);
     } else upsert(foodId, food.defaultQty);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setSaveHint(null);
-    try {
-      const { draft: saved, persisted } = await saveDietLog(date, entries);
-      onSaved(saved);
-      setEditing(false);
-      setSaveHint(persisted === 'file' ? 'Saved to day file' : 'Saved on this device');
-    } catch {
-      setSaveHint('Could not save');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const updateCustom = (patch: { calories?: number; protein_g?: number; note?: string }) => {
@@ -181,7 +183,7 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
               </p>
             ) : (
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                {done ? 'Logged · tap to collapse' : `Maintenance ${MAINTENANCE_CALORIES} kcal · tap to collapse`}
+                Maintenance {MAINTENANCE_CALORIES} kcal · autosaves
               </p>
             )}
           </div>
@@ -199,55 +201,13 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
       </button>
 
       <SmoothCollapse open={expanded}>
-        {done ? (
-          <div className="p-5 sm:p-6">
-            <div
-              className="rounded-xl border p-4 flex items-start gap-3"
-              style={{ backgroundColor: 'var(--accent-wash)', borderColor: 'var(--accent)' }}
-            >
-              <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {logged.calories} kcal · {logged.protein_g}g protein · {energyBalance(logged.calories).label}
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 text-xs font-medium underline cursor-pointer"
-                  style={{ color: 'var(--accent)' }}
-                  onClick={() => {
-                    setEntries((existing?.entries ?? []).map(normalizeEntry));
-                    setEditing(true);
-                    setSaveHint(null);
-                  }}
-                >
-                  Change
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
         <>
-          <div className="px-5 sm:px-6 pt-4 pb-3">
-            {saveHint && saveHint === 'Could not save' && (
+          <div className="px-5 sm:px-6 pt-4 pb-5">
+            {error && (
               <p className="text-xs mb-3" style={{ color: 'var(--rose)' }}>
-                {saveHint}
+                {error}
               </p>
             )}
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleSave}
-              className="w-full py-3 rounded-xl text-sm font-semibold border transition-colors cursor-pointer disabled:opacity-40"
-              style={{
-                backgroundColor: 'var(--accent)',
-                borderColor: 'var(--accent)',
-                color: '#fff',
-              }}
-            >
-              {saving ? 'Saving…' : 'Save diet log'}
-            </button>
-          </div>
-          <div className="px-5 sm:px-6 pt-1 pb-5">
             <div
               className="mb-3 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1"
               style={{
@@ -334,10 +294,7 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
               <button
                 type="button"
                 disabled={entries.length === 0}
-                onClick={() => {
-                  setEntries([]);
-                  setSaveHint(null);
-                }}
+                onClick={() => setEntries([])}
                 className="text-xs font-medium cursor-pointer disabled:opacity-30 disabled:cursor-default shrink-0"
                 style={{ color: 'var(--rose)' }}
               >
@@ -470,7 +427,6 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
             </div>
           </div>
         </>
-        )}
       </SmoothCollapse>
     </div>
   );

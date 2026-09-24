@@ -31,6 +31,7 @@ import {
   readHabitTimeDraftsFromStorage,
   type HabitTimeDraft,
 } from './data/habitTimeDrafts';
+import { fetchCloudOverlays } from './data/cloudOverlays';
 import type { DietDraft } from './data/foodMenu';
 import { CHALLENGE_START_DATE, type GymLog } from './types';
 import { TopBar } from './components/TopBar';
@@ -100,6 +101,23 @@ export default function App() {
       localStorage.setItem('cadence_theme', 'light');
     }
   }, [isDark]);
+
+  // Netlify Blobs overlays — cloud memory for quick-logs across devices
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const overlays = await fetchCloudOverlays();
+      if (!overlays || cancelled) return;
+      setGymDrafts((prev) => ({ ...prev, ...overlays.gym }));
+      setDietDrafts((prev) => ({ ...prev, ...overlays.diet }));
+      setWeightDrafts((prev) => ({ ...prev, ...overlays.weight }));
+      setLearningDrafts((prev) => ({ ...prev, ...overlays.learning }));
+      setOutreachDrafts((prev) => ({ ...prev, ...overlays.outreach }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleTheme = () => {
     setIsDark((prev) => !prev);

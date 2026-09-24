@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dumbbell, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Dumbbell, ChevronDown, ChevronUp } from 'lucide-react';
 import type { GymLog } from '../types';
 import { saveGymLog } from '../data/gymDrafts';
 import { SmoothCollapse } from './SmoothCollapse';
@@ -53,18 +53,16 @@ function ChoiceRow({
 
 export const GymQuickLog: React.FC<GymQuickLogProps> = ({ date, existing, onSaved }) => {
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(!existing);
   const [hit, setHit] = useState<boolean | null>(existing ? existing.hit : null);
   const [cardio, setCardio] = useState<boolean | null>(
     existing ? Boolean(existing.cardio) : null
   );
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setHit(existing ? existing.hit : null);
     setCardio(existing ? Boolean(existing.cardio) : null);
-    setEditing(!existing);
+    setError(null);
   }, [date, existing]);
 
   const previewScore = useMemo(() => {
@@ -74,21 +72,13 @@ export const GymQuickLog: React.FC<GymQuickLogProps> = ({ date, existing, onSave
     return cardio ? 5 : 4;
   }, [hit, cardio]);
 
-  const canSave = hit === false || (hit === true && cardio !== null);
-  const done = Boolean(existing) && !editing;
-
-  const handleSave = async () => {
-    if (!canSave || hit === null) return;
-    setSaving(true);
+  const persist = async (nextHit: boolean, nextCardio: boolean) => {
     setError(null);
     try {
-      const { gym } = await saveGymLog(date, hit, hit ? Boolean(cardio) : false);
+      const { gym } = await saveGymLog(date, nextHit, nextHit ? nextCardio : false);
       onSaved(gym);
-      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -139,7 +129,7 @@ export const GymQuickLog: React.FC<GymQuickLogProps> = ({ date, existing, onSave
               </p>
             ) : (
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                Quick log · tap to collapse
+                Autosaves when answered · tap to collapse
               </p>
             )}
           </div>
@@ -158,84 +148,46 @@ export const GymQuickLog: React.FC<GymQuickLogProps> = ({ date, existing, onSave
 
       <SmoothCollapse open={expanded}>
         <div className="p-5 sm:p-6 space-y-4">
-          {done ? (
-            <div
-              className="rounded-xl border p-4 flex items-start gap-3"
-              style={{ backgroundColor: 'var(--accent-wash)', borderColor: 'var(--accent)' }}
-            >
-              <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  Hit: {existing!.hit ? 'Yes' : 'No'}
-                  {existing!.hit ? ` · Cardio: ${existing!.cardio ? 'Yes' : 'No'}` : ''}
-                  {' · '}
-                  Score {existing!.score}/5
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 text-xs font-medium underline cursor-pointer"
-                  style={{ color: 'var(--accent)' }}
-                  onClick={() => {
-                    setHit(existing!.hit);
-                    setCardio(existing!.hit ? Boolean(existing!.cardio) : false);
-                    setEditing(true);
-                  }}
-                >
-                  Change answers
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
-                <ChoiceRow
-                  label="Did you go to the gym?"
-                  value={hit}
-                  onChange={(v) => {
-                    setHit(v);
-                    if (!v) setCardio(false);
-                    else setCardio(null);
-                  }}
-                />
-                <ChoiceRow
-                  label="Did you do cardio?"
-                  value={cardio}
-                  disabled={hit !== true}
-                  onChange={setCardio}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
+            <ChoiceRow
+              label="Did you go to the gym?"
+              value={hit}
+              onChange={(v) => {
+                setHit(v);
+                if (!v) {
+                  setCardio(false);
+                  void persist(false, false);
+                } else {
+                  setCardio(null);
+                }
+              }}
+            />
+            <ChoiceRow
+              label="Did you do cardio?"
+              value={cardio}
+              disabled={hit !== true}
+              onChange={(v) => {
+                setCardio(v);
+                if (hit === true) void persist(true, v);
+              }}
+            />
+          </div>
 
-              {previewScore !== null && (
-                <p className="text-xs font-mono-code" style={{ color: 'var(--muted)' }}>
-                  Gym score → <span style={{ color: 'var(--accent)' }}>{previewScore}/5</span>
-                  {previewScore === 5
-                    ? ' (gym + cardio)'
-                    : previewScore === 4
-                      ? ' (gym, no cardio)'
-                      : ' (missed)'}
-                </p>
-              )}
+          {previewScore !== null && (
+            <p className="text-xs font-mono-code" style={{ color: 'var(--muted)' }}>
+              Gym score → <span style={{ color: 'var(--accent)' }}>{previewScore}/5</span>
+              {previewScore === 5
+                ? ' (gym + cardio)'
+                : previewScore === 4
+                  ? ' (gym, no cardio)'
+                  : ' (missed)'}
+            </p>
+          )}
 
-              {error && (
-                <p className="text-xs" style={{ color: 'var(--rose)' }}>
-                  {error}
-                </p>
-              )}
-
-              <button
-                type="button"
-                disabled={!canSave || saving}
-                onClick={handleSave}
-                className="w-full py-3 rounded-xl text-sm font-semibold border transition-colors cursor-pointer disabled:opacity-40"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  borderColor: 'var(--accent)',
-                  color: '#fff',
-                }}
-              >
-                {saving ? 'Saving…' : 'Save gym log'}
-              </button>
-            </>
+          {error && (
+            <p className="text-xs" style={{ color: 'var(--rose)' }}>
+              {error}
+            </p>
           )}
         </div>
       </SmoothCollapse>

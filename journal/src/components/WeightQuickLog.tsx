@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Scale, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Scale, ChevronDown, ChevronUp } from 'lucide-react';
 import { FALLBACK_MORNING_KG, saveWeightLog, type WeightDraft } from '../data/weightDrafts';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { NumberStepper } from './NumberStepper';
 import { SmoothCollapse } from './SmoothCollapse';
 
@@ -24,36 +25,43 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
   onSaved,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(!existing);
   const [kg, setKg] = useState(() =>
     existing ? formatKg(existing.morning_kg) : formatKg(defaultKg)
   );
-  const [saving, setSaving] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setKg(existing ? formatKg(existing.morning_kg) : formatKg(defaultKg));
-    setEditing(!existing);
+    setTouched(false);
+    setError(null);
   }, [date, existing, defaultKg]);
 
   const parsed = Number(kg);
-  const canSave = Number.isFinite(parsed) && parsed > 20 && parsed < 300;
-  const done = Boolean(existing) && !editing;
+  const valid = Number.isFinite(parsed) && parsed > 20 && parsed < 300;
+  const unchanged =
+    existing != null && valid && Math.abs(existing.morning_kg - parsed) < 0.05;
+  // Prefill must not write until the user edits the stepper
+  const ready = valid && !unchanged && (existing != null || touched);
 
-  const handleSave = async () => {
-    if (!canSave) return;
-    setSaving(true);
+  const persist = useCallback(async () => {
+    if (!valid) return;
     setError(null);
     try {
       const { draft } = await saveWeightLog(date, parsed);
       onSaved(draft);
-      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save');
-    } finally {
-      setSaving(false);
     }
-  };
+  }, [date, onSaved, parsed, valid]);
+
+  useAutoSave(date, ready, kg, persist);
+
+  const collapsedSummary = existing
+    ? `${existing.morning_kg.toFixed(1)} kg`
+    : fromPreviousDay
+      ? `${formatKg(defaultKg)} kg · from yesterday`
+      : `${formatKg(defaultKg)} kg · not set`;
 
   return (
     <div
@@ -92,13 +100,13 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
             </h4>
             {!expanded ? (
               <p className="text-xs font-mono-code mt-0.5 truncate" style={{ color: 'var(--muted)' }}>
-                {existing ? `${existing.morning_kg.toFixed(1)} kg` : `${formatKg(defaultKg)} kg · not saved`}
+                {collapsedSummary}
               </p>
             ) : (
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
                 {fromPreviousDay
-                  ? `Prefills yesterday (${formatKg(defaultKg)} kg) · tap to collapse`
-                  : 'Weigh after waking · tap to collapse'}
+                  ? `Prefills yesterday (${formatKg(defaultKg)} kg) · autosaves`
+                  : 'Weigh after waking · autosaves'}
               </p>
             )}
           </div>
@@ -117,63 +125,26 @@ export const WeightQuickLog: React.FC<WeightQuickLogProps> = ({
 
       <SmoothCollapse open={expanded}>
         <div className="p-5 sm:p-6 space-y-4">
-          {done ? (
-            <div
-              className="rounded-xl border p-4 flex items-start gap-3"
-              style={{ backgroundColor: 'var(--accent-wash)', borderColor: 'var(--accent)' }}
-            >
-              <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                  {existing!.morning_kg.toFixed(1)} kg logged
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 text-xs font-medium underline cursor-pointer"
-                  style={{ color: 'var(--accent)' }}
-                  onClick={() => {
-                    setKg(formatKg(existing!.morning_kg));
-                    setEditing(true);
-                  }}
-                >
-                  Change
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <NumberStepper
-                value={kg}
-                onChange={setKg}
-                step={0.1}
-                min={30}
-                max={250}
-                decimals={1}
-                unit="kg"
-                size="lg"
-                placeholder={formatKg(defaultKg)}
-                emptyStart={defaultKg}
-                aria-label="Morning weight in kilograms"
-              />
-              {error && (
-                <p className="text-xs" style={{ color: 'var(--rose)' }}>
-                  {error}
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={!canSave || saving}
-                onClick={handleSave}
-                className="w-full py-3 rounded-xl text-sm font-semibold border transition-colors cursor-pointer disabled:opacity-40"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  borderColor: 'var(--accent)',
-                  color: '#fff',
-                }}
-              >
-                {saving ? 'Saving…' : 'Save morning weight'}
-              </button>
-            </>
+          <NumberStepper
+            value={kg}
+            onChange={(v) => {
+              setTouched(true);
+              setKg(v);
+            }}
+            step={0.1}
+            min={30}
+            max={250}
+            decimals={1}
+            unit="kg"
+            size="lg"
+            placeholder={formatKg(defaultKg)}
+            emptyStart={defaultKg}
+            aria-label="Morning weight in kilograms"
+          />
+          {error && (
+            <p className="text-xs" style={{ color: 'var(--rose)' }}>
+              {error}
+            </p>
           )}
         </div>
       </SmoothCollapse>
