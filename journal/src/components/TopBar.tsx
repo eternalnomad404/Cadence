@@ -1,5 +1,5 @@
 import React from 'react';
-import { Moon, Sun, Lock } from 'lucide-react';
+import { Moon, Sun, Lock, ClipboardList, ArrowLeft } from 'lucide-react';
 import { formatDisplayDate, getChallengeDayNumber } from '../data/days';
 import { CHALLENGE_TOTAL_DAYS } from '../types';
 
@@ -8,12 +8,16 @@ interface TopBarProps {
   isDark: boolean;
   onToggleTheme: () => void;
   onJumpToDate?: (date: string) => void;
+  showMeals?: boolean;
+  onToggleMeals?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   currentDate,
   isDark,
   onToggleTheme,
+  showMeals = false,
+  onToggleMeals,
 }) => {
   const displayDate = formatDisplayDate(currentDate);
   const challenge = getChallengeDayNumber(currentDate);
@@ -87,6 +91,25 @@ export const TopBar: React.FC<TopBarProps> = ({
                   Day {challenge.dayNumber} / {CHALLENGE_TOTAL_DAYS}
                 </span>
               </div>
+            )}
+
+            {/* Today's meal plan toggle */}
+            {onToggleMeals && (
+              <button
+                id="meals-toggle-btn"
+                type="button"
+                onClick={onToggleMeals}
+                aria-pressed={showMeals}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 cursor-pointer"
+                style={{
+                  backgroundColor: showMeals ? 'var(--accent)' : 'var(--accent-wash)',
+                  color: showMeals ? '#fff' : 'var(--accent)',
+                  borderColor: showMeals ? 'var(--accent)' : 'var(--border)',
+                }}
+              >
+                {showMeals ? <ArrowLeft className="w-4 h-4" /> : <ClipboardList className="w-4 h-4" />}
+                <span className="text-xs">{showMeals ? 'Back to log' : "Today's meal"}</span>
+              </button>
             )}
 
             {/* Dark / Light Toggle */}
