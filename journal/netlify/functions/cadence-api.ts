@@ -20,6 +20,20 @@ async function writeDay(date: string, patch: DayRecord): Promise<DayRecord> {
   return next;
 }
 
+/** Keep only well-formed meal swaps: { "meal1:food-id": { foodId, qty } }. */
+function cleanSwaps(value: unknown): Record<string, { foodId: string; qty: number }> {
+  const out: Record<string, { foodId: string; qty: number }> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [slot, swap] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^meal\d:[a-z0-9-]+$/.test(slot) || !swap || typeof swap !== 'object') continue;
+    const { foodId, qty } = swap as { foodId?: unknown; qty?: unknown };
+    if (typeof foodId !== 'string' || !/^[a-z0-9-]+$/.test(foodId)) continue;
+    if (typeof qty !== 'number' || !Number.isFinite(qty) || qty <= 0) continue;
+    out[slot] = { foodId, qty };
+  }
+  return out;
+}
+
 async function readBody(req: Request): Promise<Record<string, unknown>> {
   return (await req.json()) as Record<string, unknown>;
 }
@@ -139,9 +153,13 @@ export default async (req: Request) => {
         maintenance_kcal: 2400,
         meals_done: Array.isArray((diet as { meals_done?: unknown }).meals_done)
           ? ((diet as { meals_done: unknown[] }).meals_done.filter(
-              (v) => typeof v === 'string' && /^meal\d$/.test(v)
+              (v) => typeof v === 'string' && /^meal\d(:[a-z0-9-]+)?$/.test(v)
             ) as string[])
           : prevDiet.meals_done ?? [],
+        meal_swaps:
+          'meal_swaps' in diet
+            ? cleanSwaps((diet as { meal_swaps?: unknown }).meal_swaps)
+            : prevDiet.meal_swaps ?? {},
       };
       await writeDay(date, { diet: dietBlock });
       return json({ ok: true, date, diet: dietBlock });

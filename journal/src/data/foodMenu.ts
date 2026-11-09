@@ -46,7 +46,11 @@ export type DietDraft = {
   protein_g: number;
   /** Planned meals ticked as eaten on the Today's meal page (e.g. "meal1"). */
   mealsDone?: string[];
+  /** Planned items swapped for another food that day, keyed by slot (e.g. "meal1:salad-chaat"). */
+  mealSwaps?: Record<string, MealSwap>;
 };
+
+export type MealSwap = { foodId: string; qty: number };
 
 export function getFoodById(id: string): FoodItem | undefined {
   return FOOD_MENU.find((f) => f.id === id);

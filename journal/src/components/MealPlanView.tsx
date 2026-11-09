@@ -1,6 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { Check, ClipboardList } from 'lucide-react';
-import { getFoodById, macrosForEntry, type DietDraft, type DietEntry } from '../data/foodMenu';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeftRight, Check, ClipboardList, RotateCcw, X } from 'lucide-react';
+import {
+  getFoodById,
+  macrosForEntry,
+  type DietDraft,
+  type DietEntry,
+  type MealSwap,
+} from '../data/foodMenu';
 import { saveDietLog } from '../data/dietDrafts';
 import {
   MEAL_PLAN_TARGET,
@@ -11,35 +17,60 @@ import {
   otherWeek,
   planWeekOf,
   weekdayOf,
+  weeklyFoodOptions,
   type PlanWeek,
+  type PlannedItem,
   type PlannedMeal,
   type Weekday,
 } from '../data/mealPlan';
 
 interface MealPlanViewProps {
   date: string;
-  /** Today's diet log; ticking a meal adds its foods here. */
+  /** Today's diet log; ticking an item adds its food here. */
   dietDraft?: DietDraft | null;
   onDietSaved?: (draft: DietDraft) => void;
 }
 
+/** One row on a meal card: the food shown (planned or swapped in) plus the plan slot it fills. */
+type SlotItem = PlannedItem & {
+  /** Stable key for the planned slot, e.g. "meal1:salad-chaat". Ticks and swaps use it. */
+  slot: string;
+  /** The originally planned item when this slot was swapped today. */
+  planned?: PlannedItem;
+};
+
+type SlotMeal = Omit<PlannedMeal, 'items'> & { items: SlotItem[] };
+
 const round1 = (n: number) => Number(n.toFixed(1));
 
-/** Add (or remove) a meal's planned foods to the day's diet entries, merging by food. */
-function applyMeal(entries: DietEntry[], meal: PlannedMeal, adding: boolean): DietEntry[] {
+const slotKey = (mealId: string, foodId: string) => `${mealId}:${foodId}`;
+
+/** Add (or remove) one item to the day's diet entries, merging by food. */
+function applyItem(entries: DietEntry[], item: PlannedItem, adding: boolean): DietEntry[] {
   const next = entries.map((e) => ({ ...e }));
-  for (const item of meal.items) {
-    const idx = next.findIndex((e) => e.foodId === item.foodId);
-    if (adding) {
-      if (idx >= 0) next[idx].qty = round1((next[idx].qty ?? 0) + item.qty);
-      else next.push({ foodId: item.foodId, qty: item.qty });
-    } else if (idx >= 0) {
-      const q = round1((next[idx].qty ?? 0) - item.qty);
-      if (q <= 0) next.splice(idx, 1);
-      else next[idx].qty = q;
-    }
+  const idx = next.findIndex((e) => e.foodId === item.foodId);
+  if (adding) {
+    if (idx >= 0) next[idx].qty = round1((next[idx].qty ?? 0) + item.qty);
+    else next.push({ foodId: item.foodId, qty: item.qty });
+  } else if (idx >= 0) {
+    const q = round1((next[idx].qty ?? 0) - item.qty);
+    if (q <= 0) next.splice(idx, 1);
+    else next[idx].qty = q;
   }
   return next;
+}
+
+/** Apply the day's swaps to the plan. Without swaps every slot shows its planned food. */
+function withSwaps(plan: PlannedMeal[], swaps: Record<string, MealSwap>): SlotMeal[] {
+  return plan.map((meal) => ({
+    ...meal,
+    items: meal.items.map((item) => {
+      const slot = slotKey(meal.id, item.foodId);
+      const swap = swaps[slot];
+      if (!swap || !getFoodById(swap.foodId)) return { ...item, slot };
+      return { foodId: swap.foodId, qty: swap.qty, slot, planned: item };
+    }),
+  }));
 }
 
 function qtyLabel(qty: number, unitLabel: string, unit: string): string {
@@ -47,13 +78,22 @@ function qtyLabel(qty: number, unitLabel: string, unit: string): string {
   return `${qty} ${unitLabel}${qty === 1 ? '' : 's'}`;
 }
 
+const FoodThumb: React.FC<{ image?: string; alt: string }> = ({ image, alt }) => (
+  <div className="w-16 h-12 rounded-xl overflow-hidden food-menu-plate shrink-0">
+    {image ? <img src={image} alt={alt} className="w-full h-full object-contain p-1" loading="lazy" /> : null}
+  </div>
+);
+
 const MealCard: React.FC<{
-  meal: PlannedMeal;
-  done?: boolean;
-  busy?: boolean;
-  onToggle?: () => void;
-}> = ({ meal, done = false, busy = false, onToggle }) => {
+  meal: SlotMeal;
+  isDone?: (item: SlotItem) => boolean;
+  busyKey?: string | null;
+  onToggleItem?: (item: SlotItem) => void;
+  onPickSwap?: (item: SlotItem) => void;
+}> = ({ meal, isDone, busyKey = null, onToggleItem, onPickSwap }) => {
   const totals = mealTotals(meal.items);
+  const doneCount = isDone ? meal.items.filter((item) => isDone(item)).length : 0;
+  const done = meal.items.length > 0 && doneCount === meal.items.length;
 
   return (
     <div
@@ -82,6 +122,11 @@ const MealCard: React.FC<{
           >
             {meal.size === 'big' ? 'Big' : 'Light'}
           </span>
+          {onToggleItem && meal.items.length > 0 && (
+            <span className="text-[11px] font-mono-code tabular-nums" style={{ color: done ? 'var(--accent)' : 'var(--faint)' }}>
+              {doneCount}/{meal.items.length} eaten
+            </span>
+          )}
         </div>
         <p className="text-xs font-mono-code tabular-nums shrink-0" style={{ color: 'var(--muted)' }}>
           {totals.calories} kcal · <span style={{ color: 'var(--accent)' }}>{totals.protein_g}g P</span>
@@ -94,29 +139,32 @@ const MealCard: React.FC<{
         </p>
       ) : (
         <ul>
-          {meal.items.map((item, i) => {
+          {meal.items.map((item) => {
             const food = getFoodById(item.foodId);
             if (!food) return null;
             const macros = macrosForEntry({ foodId: item.foodId, qty: item.qty });
-            return (
-              <li
-                key={`${item.foodId}-${i}`}
-                className="flex items-center gap-3 px-4 py-3 border-t first:border-t-0"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <div className="w-16 h-12 rounded-xl overflow-hidden food-menu-plate shrink-0">
-                  {food.image ? (
-                    <img src={food.image} alt={food.brand} className="w-full h-full object-contain p-1" loading="lazy" />
-                  ) : null}
-                </div>
+            const eaten = isDone ? isDone(item) : false;
+            const busy = busyKey === item.slot;
+            const plannedFood = item.planned ? getFoodById(item.planned.foodId) : undefined;
+
+            const details = (
+              <>
+                <FoodThumb image={food.image} alt={food.brand} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
-                    {food.name}
+                  <p className="text-sm font-semibold truncate flex items-center gap-1.5" style={{ color: 'var(--ink)' }}>
+                    <span className="truncate">{food.name}</span>
+                    {onPickSwap && <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--faint)' }} />}
                   </p>
-                  {item.note && (
-                    <p className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
-                      {item.note}
+                  {plannedFood ? (
+                    <p className="text-xs font-medium truncate" style={{ color: 'var(--accent)' }}>
+                      Instead of {plannedFood.name}
                     </p>
+                  ) : (
+                    item.note && (
+                      <p className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                        {item.note}
+                      </p>
+                    )
                   )}
                   <p className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
                     {qtyLabel(item.qty, food.unitLabel, food.unit)} · {food.brand}
@@ -126,31 +174,155 @@ const MealCard: React.FC<{
                   <p style={{ color: 'var(--ink)' }}>{macros.calories} kcal</p>
                   <p style={{ color: 'var(--accent)' }}>{macros.protein_g}g P</p>
                 </div>
+              </>
+            );
+
+            return (
+              <li
+                key={item.slot}
+                className="flex items-center gap-3 px-4 py-3 border-t first:border-t-0 transition-colors"
+                style={{ borderColor: 'var(--border)', backgroundColor: eaten ? 'var(--accent-wash)' : undefined }}
+              >
+                {onPickSwap ? (
+                  <button
+                    type="button"
+                    onClick={() => onPickSwap(item)}
+                    disabled={busyKey !== null}
+                    title="Ate something else? Tap to swap"
+                    className="flex-1 min-w-0 flex items-center gap-3 text-left cursor-pointer rounded-xl -m-1 p-1 transition-colors hover:bg-[var(--sidebar)] disabled:cursor-wait"
+                  >
+                    {details}
+                  </button>
+                ) : (
+                  <div className="flex-1 min-w-0 flex items-center gap-3">{details}</div>
+                )}
+                {onToggleItem && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleItem(item)}
+                    disabled={busyKey !== null}
+                    aria-pressed={eaten}
+                    aria-label={eaten ? `Undo ${food.name} eaten` : `Mark ${food.name} as eaten`}
+                    title={eaten ? 'Eaten (tap to undo)' : 'Mark as eaten'}
+                    className="w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 cursor-pointer transition-colors disabled:cursor-wait"
+                    style={{
+                      backgroundColor: eaten ? 'var(--accent)' : 'transparent',
+                      borderColor: eaten ? 'var(--accent)' : 'var(--border)',
+                      color: eaten ? '#fff' : 'var(--faint)',
+                      opacity: busy ? 0.5 : 1,
+                    }}
+                  >
+                    <Check className="w-4 h-4" strokeWidth={3} />
+                  </button>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+    </div>
+  );
+};
 
-      {onToggle && meal.items.length > 0 && (
-        <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+/** Pick another food from the weekly plan to stand in for one item today. */
+const SwapPicker: React.FC<{
+  mealLabel: string;
+  item: SlotItem;
+  onPick: (choice: PlannedItem) => void;
+  onClose: () => void;
+}> = ({ mealLabel, item, onPick, onClose }) => {
+  const current = getFoodById(item.foodId);
+  const planned = item.planned;
+  const plannedFood = planned ? getFoodById(planned.foodId) : undefined;
+  const options = useMemo(
+    () => weeklyFoodOptions().filter((o) => o.foodId !== item.foodId && o.foodId !== planned?.foodId),
+    [item.foodId, planned?.foodId]
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const row = (choice: PlannedItem, key: string, label?: React.ReactNode) => {
+    const food = getFoodById(choice.foodId);
+    if (!food) return null;
+    const macros = macrosForEntry(choice);
+    return (
+      <li key={key}>
+        <button
+          type="button"
+          onClick={() => onPick(choice)}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors hover:bg-[var(--sidebar)]"
+        >
+          <FoodThumb image={food.image} alt={food.brand} />
+          <div className="flex-1 min-w-0">
+            {label}
+            <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
+              {food.name}
+            </p>
+            <p className="text-[11px] truncate" style={{ color: 'var(--muted)' }}>
+              {qtyLabel(choice.qty, food.unitLabel, food.unit)} · {food.brand}
+            </p>
+          </div>
+          <div className="text-right text-[11px] font-mono-code tabular-nums shrink-0">
+            <p style={{ color: 'var(--ink)' }}>{macros.calories} kcal</p>
+            <p style={{ color: 'var(--accent)' }}>{macros.protein_g}g P</p>
+          </div>
+        </button>
+      </li>
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Swap food"
+    >
+      <div
+        className="w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl border overflow-hidden"
+        style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', boxShadow: 'var(--card-shadow)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 flex items-center justify-between gap-3 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div className="min-w-0">
+            <p className="text-[11px] font-mono-code uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+              {mealLabel} · swap
+            </p>
+            <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
+              Ate something instead of {current?.name ?? 'this'}?
+            </p>
+          </div>
           <button
             type="button"
-            onClick={onToggle}
-            disabled={busy}
-            aria-pressed={done}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-wait"
-            style={{
-              backgroundColor: done ? 'var(--accent)' : 'var(--accent-wash)',
-              color: done ? '#fff' : 'var(--accent)',
-              borderColor: 'var(--accent)',
-            }}
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1.5 rounded-lg cursor-pointer"
+            style={{ color: 'var(--muted)' }}
           >
-            {done && <Check className="w-4 h-4" />}
-            {busy ? 'Saving...' : done ? 'Eaten · added to today (tap to undo)' : `Mark ${meal.label} as eaten`}
+            <X className="w-5 h-5" />
           </button>
         </div>
-      )}
+        <ul className="overflow-y-auto py-1">
+          {planned &&
+            plannedFood &&
+            row(
+              planned,
+              'back-to-plan',
+              <p className="text-[11px] font-medium flex items-center gap-1" style={{ color: 'var(--accent)' }}>
+                <RotateCcw className="w-3 h-3" /> Back to plan
+              </p>
+            )}
+          {options.map((o) => row(o, o.foodId))}
+        </ul>
+      </div>
     </div>
   );
 };
@@ -173,38 +345,77 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({ date, dietDraft, onD
   const thisWeek = useMemo(() => planWeekOf(date), [date]);
   const [day, setDay] = useState<Weekday>(todayKey);
   const [week, setWeek] = useState<PlanWeek>(thisWeek);
-  const plan = useMemo(
+  const basePlan = useMemo(
     () => (SHOW_DAY_PICKER ? MEAL_PLAN_WEEKS[week][day] : getMealPlanForDate(date)),
     [week, day, date]
   );
-  const totals = useMemo(() => dayPlanTotals(plan), [plan]);
-  const [busyMeal, setBusyMeal] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [swapTarget, setSwapTarget] = useState<{ meal: SlotMeal; item: SlotItem } | null>(null);
 
-  // Ticking meals only makes sense for the real today, not a previewed day.
+  // Ticks and swaps only apply to the real today, not a previewed day.
   const viewingToday = !SHOW_DAY_PICKER || (week === thisWeek && day === todayKey);
+  const canEdit = viewingToday && !!onDietSaved;
   const mealsDone = useMemo(() => new Set(dietDraft?.mealsDone ?? []), [dietDraft]);
+  const mealSwaps = useMemo(() => dietDraft?.mealSwaps ?? {}, [dietDraft]);
+  const plan = useMemo(() => withSwaps(basePlan, viewingToday ? mealSwaps : {}), [basePlan, viewingToday, mealSwaps]);
+  const totals = useMemo(() => dayPlanTotals(plan), [plan]);
   const eaten = { calories: dietDraft?.calories ?? 0, protein_g: dietDraft?.protein_g ?? 0 };
   const eatenKcalPct = Math.min(100, Math.round((eaten.calories / MEAL_PLAN_TARGET.calories) * 100));
   const eatenOver = eaten.calories > MEAL_PLAN_TARGET.calories;
 
-  const toggleMeal = async (meal: PlannedMeal) => {
-    if (busyMeal || !onDietSaved) return;
-    const adding = !mealsDone.has(meal.id);
-    const entries = applyMeal(dietDraft?.entries ?? [], meal, adding);
-    const nextDone = adding
-      ? [...mealsDone, meal.id]
-      : [...mealsDone].filter((id) => id !== meal.id);
-    setBusyMeal(meal.id);
+  // A bare "meal1" is an older whole-meal tick: every item in that meal counts as eaten.
+  const isItemDone = (meal: SlotMeal, item: SlotItem) => mealsDone.has(meal.id) || mealsDone.has(item.slot);
+
+  /** Copy of the ticks with any old whole-meal tick expanded into per-item ticks. */
+  const expandedDone = (meal: SlotMeal) => {
+    const done = new Set(mealsDone);
+    if (done.has(meal.id)) {
+      done.delete(meal.id);
+      for (const it of meal.items) done.add(it.slot);
+    }
+    return done;
+  };
+
+  const persist = async (busy: string, entries: DietEntry[], done: Set<string>, swaps: Record<string, MealSwap>) => {
+    if (!onDietSaved) return;
+    setBusyKey(busy);
     setSaveError(null);
     try {
-      const { draft } = await saveDietLog(date, entries, nextDone);
+      const { draft } = await saveDietLog(date, entries, [...done], swaps);
       onDietSaved(draft);
     } catch {
       setSaveError('Could not save. Try again.');
     } finally {
-      setBusyMeal(null);
+      setBusyKey(null);
     }
+  };
+
+  const toggleItem = async (meal: SlotMeal, item: SlotItem) => {
+    if (busyKey || !canEdit) return;
+    const adding = !isItemDone(meal, item);
+    const entries = applyItem(dietDraft?.entries ?? [], item, adding);
+    const done = expandedDone(meal);
+    if (adding) done.add(item.slot);
+    else done.delete(item.slot);
+    await persist(item.slot, entries, done, mealSwaps);
+  };
+
+  const swapItem = async (meal: SlotMeal, item: SlotItem, choice: PlannedItem) => {
+    setSwapTarget(null);
+    if (busyKey || !canEdit) return;
+    const planned = item.planned ?? { foodId: item.foodId, qty: item.qty };
+    const swaps = { ...mealSwaps };
+    if (choice.foodId === planned.foodId) delete swaps[item.slot];
+    else swaps[item.slot] = { foodId: choice.foodId, qty: choice.qty };
+
+    // If this slot was already ticked, move the eaten food over to the new choice.
+    let entries = dietDraft?.entries ?? [];
+    if (isItemDone(meal, item)) {
+      entries = applyItem(entries, item, false);
+      entries = applyItem(entries, choice, true);
+    }
+    await persist(item.slot, entries, expandedDone(meal), swaps);
   };
 
   const kcalLeft = Math.max(0, MEAL_PLAN_TARGET.calories - totals.calories);
@@ -356,7 +567,8 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({ date, dietDraft, onD
               />
             </div>
             <p className="text-[11px] mt-2" style={{ color: 'var(--faint)' }}>
-              Same total as the Diet card. Marking a meal adds its foods there; extras you log in Diet count too.
+              Tick an item to add it to today. Tap a food to swap it if you ate something else. Same total as the Diet
+              card; extras you log there count too.
             </p>
             {saveError && (
               <p className="text-xs mt-2" style={{ color: 'var(--rose)' }}>
@@ -372,12 +584,22 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({ date, dietDraft, onD
           <MealCard
             key={meal.id}
             meal={meal}
-            done={viewingToday && mealsDone.has(meal.id)}
-            busy={busyMeal === meal.id}
-            onToggle={viewingToday && onDietSaved ? () => void toggleMeal(meal) : undefined}
+            isDone={viewingToday ? (item) => isItemDone(meal, item) : undefined}
+            busyKey={busyKey}
+            onToggleItem={canEdit ? (item) => void toggleItem(meal, item) : undefined}
+            onPickSwap={canEdit ? (item) => setSwapTarget({ meal, item }) : undefined}
           />
         ))}
       </div>
+
+      {swapTarget && (
+        <SwapPicker
+          mealLabel={swapTarget.meal.label}
+          item={swapTarget.item}
+          onPick={(choice) => void swapItem(swapTarget.meal, swapTarget.item, choice)}
+          onClose={() => setSwapTarget(null)}
+        />
+      )}
     </div>
   );
 };

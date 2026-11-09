@@ -163,6 +163,21 @@ export function getMealPlanForDate(date: string): PlannedMeal[] {
   return MEAL_PLAN_WEEKS[planWeekOf(date)][weekdayOf(date)];
 }
 
+/** Every food in the two-week plan, once each, with the quantity it is planned at (first use). */
+export function weeklyFoodOptions(): PlannedItem[] {
+  const seen = new Map<string, PlannedItem>();
+  for (const week of Object.values(MEAL_PLAN_WEEKS)) {
+    for (const day of WEEKDAYS) {
+      for (const meal of week[day]) {
+        for (const item of meal.items) {
+          if (!seen.has(item.foodId)) seen.set(item.foodId, { foodId: item.foodId, qty: item.qty });
+        }
+      }
+    }
+  }
+  return [...seen.values()];
+}
+
 export function mealTotals(items: PlannedItem[]): { calories: number; protein_g: number } {
   return items.reduce(
     (acc, item) => {

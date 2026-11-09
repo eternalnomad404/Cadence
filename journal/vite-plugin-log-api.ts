@@ -14,7 +14,22 @@ type DietPayload = {
   calories: number;
   protein_g: number;
   meals_done?: unknown[];
+  meal_swaps?: unknown;
 };
+
+/** Keep only well-formed meal swaps: { "meal1:food-id": { foodId, qty } }. */
+function cleanSwaps(value: unknown): Record<string, { foodId: string; qty: number }> {
+  const out: Record<string, { foodId: string; qty: number }> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [slot, swap] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^meal\d:[a-z0-9-]+$/.test(slot) || !swap || typeof swap !== 'object') continue;
+    const { foodId, qty } = swap as { foodId?: unknown; qty?: unknown };
+    if (typeof foodId !== 'string' || !/^[a-z0-9-]+$/.test(foodId)) continue;
+    if (typeof qty !== 'number' || !Number.isFinite(qty) || qty <= 0) continue;
+    out[slot] = { foodId, qty };
+  }
+  return out;
+}
 
 function readJson(filePath: string): Record<string, unknown> | null {
   try {
@@ -232,8 +247,10 @@ export function cadenceLogApiPlugin(journalRoot: string, repoRoot: string): Plug
             energy_delta,
             maintenance_kcal: 2400,
             meals_done: Array.isArray(diet.meals_done)
-              ? diet.meals_done.filter((v) => typeof v === 'string' && /^meal\d$/.test(v))
+              ? diet.meals_done.filter((v) => typeof v === 'string' && /^meal\d(:[a-z0-9-]+)?$/.test(v))
               : prevDiet.meals_done ?? [],
+            meal_swaps:
+              diet.meal_swaps !== undefined ? cleanSwaps(diet.meal_swaps) : prevDiet.meal_swaps ?? {},
           };
           const patch = { diet: dietBlock };
           mergeWrite(journalDays, date, patch);

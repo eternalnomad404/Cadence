@@ -1,4 +1,4 @@
-import type { DietDraft, DietEntry } from './foodMenu';
+import type { DietDraft, DietEntry, MealSwap } from './foodMenu';
 import { buildDietDraft } from './foodMenu';
 import type { DayFile } from './loadDays';
 
@@ -31,12 +31,41 @@ export function extractDietDraft(raw: DayFile): DietDraft | null {
     })
   );
   const mealsDone = cleanMealsDone((raw.diet as { meals_done?: unknown }).meals_done);
-  return mealsDone.length ? { ...draft, mealsDone } : draft;
+  const mealSwaps = cleanMealSwaps((raw.diet as { meal_swaps?: unknown }).meal_swaps);
+  return {
+    ...draft,
+    ...(mealsDone.length ? { mealsDone } : {}),
+    ...(Object.keys(mealSwaps).length ? { mealSwaps } : {}),
+  };
 }
 
 export function cleanMealsDone(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.filter((v): v is string => typeof v === 'string' && /^meal\d$/.test(v)))];
+  return [...new Set(value.filter((v): v is string => typeof v === 'string' && /^meal\d(:[a-z0-9-]+)?$/.test(v)))];
+}
+
+export function cleanMealSwaps(value: unknown): Record<string, MealSwap> {
+  const out: Record<string, MealSwap> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [slot, swap] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^meal\d:[a-z0-9-]+$/.test(slot) || !swap || typeof swap !== 'object') continue;
+    const { foodId, qty } = swap as { foodId?: unknown; qty?: unknown };
+    if (typeof foodId !== 'string' || !/^[a-z0-9-]+$/.test(foodId)) continue;
+    if (typeof qty !== 'number' || !Number.isFinite(qty) || qty <= 0) continue;
+    out[slot] = { foodId, qty };
+  }
+  return out;
+}
+
+/** True when a day has anything worth keeping: food logged or meal-plan ticks/swaps. */
+export function hasDietContent(d: DietDraft): boolean {
+  return (
+    d.entries.length > 0 ||
+    d.calories > 0 ||
+    d.protein_g > 0 ||
+    (d.mealsDone?.length ?? 0) > 0 ||
+    Object.keys(d.mealSwaps ?? {}).length > 0
+  );
 }
 
 export function loadDietDraftsFromFiles(): Record<string, DietDraft> {
@@ -56,7 +85,7 @@ export function loadDietDraftsFromFiles(): Record<string, DietDraft> {
       const raw = mod.default;
       if (raw.logged === true) continue;
       const draft = extractDietDraft(raw);
-      if (draft && raw.date && (draft.entries.length > 0 || draft.calories > 0 || draft.protein_g > 0)) {
+      if (draft && raw.date && hasDietContent(draft)) {
         out[raw.date] = draft;
       }
     }
@@ -95,11 +124,18 @@ export function mergeDietDrafts(
 export async function saveDietLog(
   date: string,
   entries: DietEntry[],
-  mealsDone?: string[]
+  mealsDone?: string[],
+  mealSwaps?: Record<string, MealSwap>
 ): Promise<{ draft: DietDraft; persisted: 'file' | 'local' }> {
-  // Keep the meal ticks when the diet card saves without knowing about them.
-  const done = cleanMealsDone(mealsDone ?? readDietDraftsFromStorage()[date]?.mealsDone);
-  const draft: DietDraft = { ...buildDietDraft(entries), ...(done.length ? { mealsDone: done } : {}) };
+  // Keep the meal ticks and swaps when the diet card saves without knowing about them.
+  const stored = readDietDraftsFromStorage()[date];
+  const done = cleanMealsDone(mealsDone ?? stored?.mealsDone);
+  const swaps = cleanMealSwaps(mealSwaps ?? stored?.mealSwaps);
+  const draft: DietDraft = {
+    ...buildDietDraft(entries),
+    ...(done.length ? { mealsDone: done } : {}),
+    ...(Object.keys(swaps).length ? { mealSwaps: swaps } : {}),
+  };
   writeDietDraftToStorage(date, draft);
 
   try {
@@ -113,6 +149,7 @@ export async function saveDietLog(
           calories: draft.calories,
           protein_g: draft.protein_g,
           ...(mealsDone !== undefined ? { meals_done: done } : {}),
+          ...(mealSwaps !== undefined ? { meal_swaps: swaps } : {}),
         },
       }),
     });

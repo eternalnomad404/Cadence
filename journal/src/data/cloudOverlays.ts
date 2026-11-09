@@ -1,6 +1,6 @@
 import type { DayFile } from './loadDays';
 import { extractGymDraft } from './gymDrafts';
-import { extractDietDraft } from './dietDrafts';
+import { extractDietDraft, hasDietContent } from './dietDrafts';
 import { extractWeightDraft, type WeightDraft } from './weightDrafts';
 import type { HabitTimeDraft } from './habitTimeDrafts';
 import type { GymLog } from '../types';
@@ -46,7 +46,7 @@ export async function fetchCloudOverlays(): Promise<CloudOverlays | null> {
       const g = extractGymDraft(raw);
       if (g) gym[date] = g;
       const d = extractDietDraft(raw);
-      if (d && (d.entries.length > 0 || d.calories > 0 || d.protein_g > 0)) diet[date] = d;
+      if (d && hasDietContent(d)) diet[date] = d;
       const w = extractWeightDraft(raw);
       if (w) weight[date] = w;
       const learn = extractHabit(raw, 'learning');
