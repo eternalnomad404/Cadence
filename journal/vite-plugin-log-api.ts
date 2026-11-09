@@ -13,6 +13,7 @@ type DietPayload = {
   entries: { foodId: string; grams: number }[];
   calories: number;
   protein_g: number;
+  meals_done?: unknown[];
 };
 
 function readJson(filePath: string): Record<string, unknown> | null {
@@ -230,6 +231,9 @@ export function cadenceLogApiPlugin(journalRoot: string, repoRoot: string): Plug
             protein_g: diet.protein_g,
             energy_delta,
             maintenance_kcal: 2400,
+            meals_done: Array.isArray(diet.meals_done)
+              ? diet.meals_done.filter((v) => typeof v === 'string' && /^meal\d$/.test(v))
+              : prevDiet.meals_done ?? [],
           };
           const patch = { diet: dietBlock };
           mergeWrite(journalDays, date, patch);

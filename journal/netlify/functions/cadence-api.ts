@@ -137,6 +137,11 @@ export default async (req: Request) => {
         protein_g: diet.protein_g,
         energy_delta,
         maintenance_kcal: 2400,
+        meals_done: Array.isArray((diet as { meals_done?: unknown }).meals_done)
+          ? ((diet as { meals_done: unknown[] }).meals_done.filter(
+              (v) => typeof v === 'string' && /^meal\d$/.test(v)
+            ) as string[])
+          : prevDiet.meals_done ?? [],
       };
       await writeDay(date, { diet: dietBlock });
       return json({ ok: true, date, diet: dietBlock });

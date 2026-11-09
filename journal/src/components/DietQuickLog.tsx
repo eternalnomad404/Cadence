@@ -84,12 +84,12 @@ export const DietQuickLog: React.FC<DietQuickLogProps> = ({
   const persist = useCallback(async () => {
     setError(null);
     try {
-      const { draft: saved } = await saveDietLog(date, entries);
+      const { draft: saved } = await saveDietLog(date, entries, existing?.mealsDone);
       onSaved(saved);
     } catch {
       setError('Could not save');
     }
-  }, [date, entries, onSaved]);
+  }, [date, entries, existing?.mealsDone, onSaved]);
 
   useAutoSave(date, ready, signature, persist);
 

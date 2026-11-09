@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ClipboardList } from 'lucide-react';
-import { getFoodById, macrosForEntry } from '../data/foodMenu';
+import { Check, ClipboardList } from 'lucide-react';
+import { getFoodById, macrosForEntry, type DietDraft, type DietEntry } from '../data/foodMenu';
+import { saveDietLog } from '../data/dietDrafts';
 import {
   MEAL_PLAN_TARGET,
   MEAL_PLAN_WEEKS,
@@ -17,6 +18,28 @@ import {
 
 interface MealPlanViewProps {
   date: string;
+  /** Today's diet log; ticking a meal adds its foods here. */
+  dietDraft?: DietDraft | null;
+  onDietSaved?: (draft: DietDraft) => void;
+}
+
+const round1 = (n: number) => Number(n.toFixed(1));
+
+/** Add (or remove) a meal's planned foods to the day's diet entries, merging by food. */
+function applyMeal(entries: DietEntry[], meal: PlannedMeal, adding: boolean): DietEntry[] {
+  const next = entries.map((e) => ({ ...e }));
+  for (const item of meal.items) {
+    const idx = next.findIndex((e) => e.foodId === item.foodId);
+    if (adding) {
+      if (idx >= 0) next[idx].qty = round1((next[idx].qty ?? 0) + item.qty);
+      else next.push({ foodId: item.foodId, qty: item.qty });
+    } else if (idx >= 0) {
+      const q = round1((next[idx].qty ?? 0) - item.qty);
+      if (q <= 0) next.splice(idx, 1);
+      else next[idx].qty = q;
+    }
+  }
+  return next;
 }
 
 function qtyLabel(qty: number, unitLabel: string, unit: string): string {
@@ -24,13 +47,22 @@ function qtyLabel(qty: number, unitLabel: string, unit: string): string {
   return `${qty} ${unitLabel}${qty === 1 ? '' : 's'}`;
 }
 
-const MealCard: React.FC<{ meal: PlannedMeal }> = ({ meal }) => {
+const MealCard: React.FC<{
+  meal: PlannedMeal;
+  done?: boolean;
+  busy?: boolean;
+  onToggle?: () => void;
+}> = ({ meal, done = false, busy = false, onToggle }) => {
   const totals = mealTotals(meal.items);
 
   return (
     <div
-      className="rounded-2xl border overflow-hidden"
-      style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', boxShadow: 'var(--card-shadow)' }}
+      className="rounded-2xl border overflow-hidden transition-colors"
+      style={{
+        backgroundColor: 'var(--surface)',
+        borderColor: done ? 'var(--accent)' : 'var(--border)',
+        boxShadow: 'var(--card-shadow)',
+      }}
     >
       <div
         className="px-5 py-4 flex items-center justify-between gap-3 border-b"
@@ -99,6 +131,26 @@ const MealCard: React.FC<{ meal: PlannedMeal }> = ({ meal }) => {
           })}
         </ul>
       )}
+
+      {onToggle && meal.items.length > 0 && (
+        <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={busy}
+            aria-pressed={done}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-wait"
+            style={{
+              backgroundColor: done ? 'var(--accent)' : 'var(--accent-wash)',
+              color: done ? '#fff' : 'var(--accent)',
+              borderColor: 'var(--accent)',
+            }}
+          >
+            {done && <Check className="w-4 h-4" />}
+            {busy ? 'Saving...' : done ? 'Eaten · added to today (tap to undo)' : `Mark ${meal.label} as eaten`}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -116,7 +168,7 @@ const DAY_PICKER: { key: Weekday; label: string }[] = [
   { key: 'sun', label: 'Sun' },
 ];
 
-export const MealPlanView: React.FC<MealPlanViewProps> = ({ date }) => {
+export const MealPlanView: React.FC<MealPlanViewProps> = ({ date, dietDraft, onDietSaved }) => {
   const todayKey = useMemo(() => weekdayOf(date), [date]);
   const thisWeek = useMemo(() => planWeekOf(date), [date]);
   const [day, setDay] = useState<Weekday>(todayKey);
@@ -126,6 +178,34 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({ date }) => {
     [week, day, date]
   );
   const totals = useMemo(() => dayPlanTotals(plan), [plan]);
+  const [busyMeal, setBusyMeal] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Ticking meals only makes sense for the real today, not a previewed day.
+  const viewingToday = !SHOW_DAY_PICKER || (week === thisWeek && day === todayKey);
+  const mealsDone = useMemo(() => new Set(dietDraft?.mealsDone ?? []), [dietDraft]);
+  const eaten = { calories: dietDraft?.calories ?? 0, protein_g: dietDraft?.protein_g ?? 0 };
+  const eatenKcalPct = Math.min(100, Math.round((eaten.calories / MEAL_PLAN_TARGET.calories) * 100));
+  const eatenOver = eaten.calories > MEAL_PLAN_TARGET.calories;
+
+  const toggleMeal = async (meal: PlannedMeal) => {
+    if (busyMeal || !onDietSaved) return;
+    const adding = !mealsDone.has(meal.id);
+    const entries = applyMeal(dietDraft?.entries ?? [], meal, adding);
+    const nextDone = adding
+      ? [...mealsDone, meal.id]
+      : [...mealsDone].filter((id) => id !== meal.id);
+    setBusyMeal(meal.id);
+    setSaveError(null);
+    try {
+      const { draft } = await saveDietLog(date, entries, nextDone);
+      onDietSaved(draft);
+    } catch {
+      setSaveError('Could not save. Try again.');
+    } finally {
+      setBusyMeal(null);
+    }
+  };
 
   const kcalLeft = Math.max(0, MEAL_PLAN_TARGET.calories - totals.calories);
   const proteinLeftMin = Math.max(0, Number((MEAL_PLAN_TARGET.proteinMin - totals.protein_g).toFixed(1)));
@@ -257,11 +337,45 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({ date }) => {
                 }`
               : 'On target'}
         </p>
+
+        {viewingToday && (
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--sidebar)' }}>
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <p className="text-[11px] font-mono-code uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                Eaten today
+              </p>
+              <p className="text-sm font-mono-code tabular-nums" style={{ color: eatenOver ? 'var(--rose)' : 'var(--ink)' }}>
+                {eaten.calories} / {MEAL_PLAN_TARGET.calories} kcal ·{' '}
+                <span style={{ color: 'var(--accent)' }}>{eaten.protein_g}g protein</span>
+              </p>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface)' }}>
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${eatenKcalPct}%`, backgroundColor: eatenOver ? 'var(--rose)' : 'var(--accent)' }}
+              />
+            </div>
+            <p className="text-[11px] mt-2" style={{ color: 'var(--faint)' }}>
+              Same total as the Diet card. Marking a meal adds its foods there; extras you log in Diet count too.
+            </p>
+            {saveError && (
+              <p className="text-xs mt-2" style={{ color: 'var(--rose)' }}>
+                {saveError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         {plan.map((meal) => (
-          <MealCard key={meal.id} meal={meal} />
+          <MealCard
+            key={meal.id}
+            meal={meal}
+            done={viewingToday && mealsDone.has(meal.id)}
+            busy={busyMeal === meal.id}
+            onToggle={viewingToday && onDietSaved ? () => void toggleMeal(meal) : undefined}
+          />
         ))}
       </div>
     </div>

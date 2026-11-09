@@ -44,6 +44,8 @@ export type DietDraft = {
   entries: DietEntry[];
   calories: number;
   protein_g: number;
+  /** Planned meals ticked as eaten on the Today's meal page (e.g. "meal1"). */
+  mealsDone?: string[];
 };
 
 export function getFoodById(id: string): FoodItem | undefined {

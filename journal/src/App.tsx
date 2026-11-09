@@ -174,7 +174,11 @@ export default function App() {
 
       <main className="flex-1 w-full max-w-none mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {showMeals ? (
-          <MealPlanView date={todayDate} />
+          <MealPlanView
+            date={todayDate}
+            dietDraft={dietDrafts[todayDate] ?? null}
+            onDietSaved={(diet) => setDietDrafts((prev) => ({ ...prev, [todayDate]: diet }))}
+          />
         ) : (
         <>
         <DateNavigation

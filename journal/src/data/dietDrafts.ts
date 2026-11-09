@@ -23,13 +23,20 @@ export function extractDietDraft(raw: DayFile): DietDraft | null {
     }
     return null;
   }
-  return buildDietDraft(
+  const draft = buildDietDraft(
     diet.entries.filter((e) => {
       if (!e || typeof e.foodId !== 'string') return false;
       const q = typeof e.qty === 'number' ? e.qty : e.grams;
       return typeof q === 'number' && q > 0;
     })
   );
+  const mealsDone = cleanMealsDone((raw.diet as { meals_done?: unknown }).meals_done);
+  return mealsDone.length ? { ...draft, mealsDone } : draft;
+}
+
+export function cleanMealsDone(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((v): v is string => typeof v === 'string' && /^meal\d$/.test(v)))];
 }
 
 export function loadDietDraftsFromFiles(): Record<string, DietDraft> {
@@ -87,16 +94,27 @@ export function mergeDietDrafts(
 
 export async function saveDietLog(
   date: string,
-  entries: DietEntry[]
+  entries: DietEntry[],
+  mealsDone?: string[]
 ): Promise<{ draft: DietDraft; persisted: 'file' | 'local' }> {
-  const draft = buildDietDraft(entries);
+  // Keep the meal ticks when the diet card saves without knowing about them.
+  const done = cleanMealsDone(mealsDone ?? readDietDraftsFromStorage()[date]?.mealsDone);
+  const draft: DietDraft = { ...buildDietDraft(entries), ...(done.length ? { mealsDone: done } : {}) };
   writeDietDraftToStorage(date, draft);
 
   try {
     const res = await fetch('/api/log-diet', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, diet: draft }),
+      body: JSON.stringify({
+        date,
+        diet: {
+          entries: draft.entries,
+          calories: draft.calories,
+          protein_g: draft.protein_g,
+          ...(mealsDone !== undefined ? { meals_done: done } : {}),
+        },
+      }),
     });
     if (res.ok) return { draft, persisted: 'file' };
   } catch {
