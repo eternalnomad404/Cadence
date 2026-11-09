@@ -279,17 +279,18 @@ export const FOOD_MENU: FoodItem[] = [
   {
     id: 'salad-chaat',
     name: 'Salad Chaat',
-    brand: 'Medium bowl · chana, sprouts, cucumber, tomato, lemon',
+    brand: 'Medium bowl · chana, sprouts, cucumber, tomato, ½ carrot, lemon',
     image: '/foods/salad-chaat.png',
     unit: 'bowl',
     unitLabel: 'bowl',
     defaultQty: 1,
     step: 1,
     // 45g dry chana (~100g boiled) 165 kcal · 9g P + 50g moong sprouts 15 · 1.5
-    // + 1 cucumber 30 · 1.3 + 1 tomato 22 · 1 + lemon/masala 5 → ~470g, ~4 katori
-    caloriesPerUnit: 240,
-    proteinPerUnit: 13,
-    detail: '1 bowl ≈ 470g · 240 kcal · 13g protein',
+    // + 1 cucumber 30 · 1.3 + 1 tomato 22 · 1 + ½ medium carrot (~32g) 13 · 0.3
+    // + lemon/masala 5 → ~500g, ~4 katori
+    caloriesPerUnit: 253,
+    proteinPerUnit: 13.3,
+    detail: '1 bowl ≈ 500g · 253 kcal · 13.3g protein',
   },
   {
     id: 'banana',

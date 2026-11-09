@@ -11,7 +11,7 @@ import { macrosForEntry } from './foodMenu';
  */
 
 export const MEAL_PLAN_TARGET = {
-  calories: 1500,
+  calories: 1550,
   proteinMin: 140,
   proteinMax: 150,
 };
